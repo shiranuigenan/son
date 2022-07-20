@@ -1,107 +1,109 @@
 ﻿namespace son;
+struct Field
+{
+    public double Luminance;
+    public double PosX;
+    public double PosY;
+    public double Radius;
+    public double SpeedX;
+    public double SpeedY;
+}
+
 class Program
 {
-    struct Daire
-    {
-        public double a;
-        public double x;
-        public double y;
-        public double r;
-        public double vx;
-        public double vy;
-    }
+    static int Width;
+    static int Height;
+    static byte[]? Pixels;
+    static int FieldCount;
+    static Field[]? Fields;
+
     static void Main(string[] args)
     {
-        var fps = 60;
-        var saniye = 1;
-        var frameSayisi = saniye * fps;
+        var Fps = 60;
+        var Duration = 15;
+        var FrameCount = Duration * Fps;
 
-        var w = 1280;
-        var h = 720;
+        var Res = 80;
 
-        var pixels = new byte[w * h * 3];
+        Width = 16 * Res;
+        Height = 9 * Res;
+        Pixels = new byte[Width * Height * 3];
 
-        var ds = 1;//daire sayısı
-        var d = new Daire[ds];
+        FieldCount = 400;
+        Fields = new Field[FieldCount];
 
-        var r = new Random();
-        for (int i = 0; i < ds; i++)
+        var random = new Random();
+        for (int i = 1; i < 201; i++)
         {
-            d[i].r = r.Next(h / 9, h / 3);
-            d[i].a = r.Next(1, 999);
-            d[i].x = w / 2;
-            d[i].y = h / 2;
-            d[i].vx = 99.9 * (r.NextDouble() - 0.5) / d[i].r;
-            d[i].vy = 99.9 * (r.NextDouble() - 0.5) / d[i].r;
+            Fields[2 * i - 1].Radius = i * Res / 48;
+            Fields[2 * i - 1].Luminance = i * 5;
+            Fields[2 * i - 1].PosX = Width / 2;
+            Fields[2 * i - 1].PosY = Height / 2;
+            Fields[2 * i - 1].SpeedX = Res * (random.NextDouble() - 0.5) / i;
+            Fields[2 * i - 1].SpeedY = Res * (random.NextDouble() - 0.5) / i;
+
+            Fields[2 * i - 2].Radius = i * Res / 48;
+            Fields[2 * i - 2].Luminance = -i * 5;
+            Fields[2 * i - 2].PosX = Width / 2;
+            Fields[2 * i - 2].PosY = Height / 2;
+            Fields[2 * i - 2].SpeedX = Res * (random.NextDouble() - 0.5) / i;
+            Fields[2 * i - 2].SpeedY = Res * (random.NextDouble() - 0.5) / i;
         }
-
-        var isikMiktari = 0.0;
-        for (int i = 0; i < ds; i++)
-            isikMiktari += d[i].a * d[i].r * d[i].r * Math.PI;
-
-        isikMiktari /= w * h;
 
         using (var Writer = new BinaryWriter(File.Create("video.raw")))
         {
-            for (int f = 0; f < frameSayisi; f++)
+            for (int f = 0; f < FrameCount; f++)
             {
-                if (f % 100 == 0)
-                    Console.WriteLine(f.ToString("D4") + " frame başladı");
+                if (f % 100 == 0) Console.WriteLine(f.ToString("D4") + " frame başladı");
 
-                Parallel.For(0, h, j =>
-                {
-                    var t = j * w * 3;
-                    for (var i = 0; i < w; i++)
-                    {
-                        var p = 0;
-                        for (int z = 0; z < ds; z++)
-                        {
-                            var u = Math.Sqrt((i - d[z].x) * (i - d[z].x) + (j - d[z].y) * (j - d[z].y));
-                            if (u < d[z].r)
-                                p += (int)(d[z].a * (1.0 - u / d[z].r));
-                        }
+                DoLine();
 
-                        var rgb = PsuedoGreyPlus(p);
-
-                        pixels[t++] = rgb[0];
-                        pixels[t++] = rgb[1];
-                        pixels[t++] = rgb[2];
-
-                    }
-                });
-
-                Writer.Write(pixels);
+                Writer.Write(Pixels);
                 Writer.Flush();
 
-                for (int i = 0; i < ds; i++)
-                {
-                    if (d[i].x + d[i].r + d[i].vx > w) d[i].vx *= -1;
-                    if (d[i].x - d[i].r + d[i].vx < 0) d[i].vx *= -1;
-                    if (d[i].y + d[i].r + d[i].vy > h) d[i].vy *= -1;
-                    if (d[i].y - d[i].r + d[i].vy < 0) d[i].vy *= -1;
+                Update();
 
-                    d[i].x += d[i].vx;
-                    d[i].y += d[i].vy;
-                }
-
-                if (f % 100 == 0)
-                    Console.WriteLine(f.ToString("D4") + " frame bitti");
+                if (f % 100 == 0) Console.WriteLine(f.ToString("D4") + " frame bitti");
             }
         }
+
+        System.Diagnostics.Process.Start("ffmpeg",
+        "-y -f rawvideo -pix_fmt rgb24 -s:v 1280x720 -r 60 -i video.raw video720p.mp4");
     }
-    public static byte[] PsuedoGreyPlus(int x)
+    static void Update()
     {
-        if (x < 0) return new byte[3] { 0, 0, 0 };
-        if (x > 4079) return new byte[3] { 255, 255, 255 };
+        for (int i = 0; i < FieldCount; i++)
+        {
+            if (Fields[i].PosX + Fields[i].Radius + Fields[i].SpeedX > Width) Fields[i].SpeedX *= -1;
+            if (Fields[i].PosX - Fields[i].Radius + Fields[i].SpeedX < 0) Fields[i].SpeedX *= -1;
+            if (Fields[i].PosY + Fields[i].Radius + Fields[i].SpeedY > Height) Fields[i].SpeedY *= -1;
+            if (Fields[i].PosY - Fields[i].Radius + Fields[i].SpeedY < 0) Fields[i].SpeedY *= -1;
 
-        var i = x / 16;
-        var j = x % 16;
+            Fields[i].PosX += Fields[i].SpeedX;
+            Fields[i].PosY += Fields[i].SpeedY;
+        }
+    }
+    static void DoLine()
+    {
+        Parallel.For(0, Height, j =>
+        {
+            var startIndex = j * Width * 3;
+            for (var i = 0; i < Width; i++)
+            {
+                var p = 2040;
+                for (int z = 0; z < FieldCount; z++)
+                {
+                    var distance = Math.Sqrt((i - Fields[z].PosX) * (i - Fields[z].PosX) + (j - Fields[z].PosY) * (j - Fields[z].PosY));
+                    if (distance < Fields[z].Radius)
+                        p += (int)(Fields[z].Luminance * (1.0 - distance / Fields[z].Radius));
+                }
 
-        var k = new byte[16, 3] { { 0, 0, 0 }, { 0, 0, 1 }, { 0, 0, 2 }, { 1, 0, 0 }, { 1, 0, 1 }, { 1, 0, 1 }, { 1, 0, 2 }, { 2, 0, 0 }, { 2, 0, 1 }, { 2, 0, 2 }, { 2, 0, 2 }, { 0, 1, 0 }, { 0, 1, 1 }, { 0, 1, 2 }, { 0, 1, 2 }, { 1, 1, 0 } };
-        var r = Math.Min(i + k[j, 0], 255);
-        var g = Math.Min(i + k[j, 1], 255);
-        var b = Math.Min(i + k[j, 2], 255);
+                var rgb = common.PsuedoGreyPlus(p);
 
-        return new byte[3] { (byte)r, (byte)g, (byte)b };
+                Pixels[startIndex++] = rgb[0];
+                Pixels[startIndex++] = rgb[1];
+                Pixels[startIndex++] = rgb[2];
+            }
+        });
     }
 }
