@@ -11,6 +11,7 @@ struct Field
 
 class Program
 {
+    static int ResolutionFactor;
     static int Width;
     static int Height;
     static byte[]? Pixels;
@@ -23,10 +24,9 @@ class Program
         var Duration = 15;
         var FrameCount = Duration * Fps;
 
-        var Res = 80;
-
-        Width = 16 * Res;
-        Height = 9 * Res;
+        ResolutionFactor = 16;
+        Width = 16 * ResolutionFactor;
+        Height = 9 * ResolutionFactor;
         Pixels = new byte[Width * Height * 3];
 
         FieldCount = 400;
@@ -35,19 +35,19 @@ class Program
         var random = new Random();
         for (int i = 1; i < 201; i++)
         {
-            Fields[2 * i - 1].Radius = i * Res / 48;
+            Fields[2 * i - 1].Radius = i * ResolutionFactor / 48;
             Fields[2 * i - 1].Luminance = i * 5;
             Fields[2 * i - 1].PosX = Width / 2;
             Fields[2 * i - 1].PosY = Height / 2;
-            Fields[2 * i - 1].SpeedX = Res * (random.NextDouble() - 0.5) / i;
-            Fields[2 * i - 1].SpeedY = Res * (random.NextDouble() - 0.5) / i;
+            Fields[2 * i - 1].SpeedX = ResolutionFactor * (random.NextDouble() - 0.5) / i;
+            Fields[2 * i - 1].SpeedY = ResolutionFactor * (random.NextDouble() - 0.5) / i;
 
-            Fields[2 * i - 2].Radius = i * Res / 48;
+            Fields[2 * i - 2].Radius = i * ResolutionFactor / 48;
             Fields[2 * i - 2].Luminance = -i * 5;
             Fields[2 * i - 2].PosX = Width / 2;
             Fields[2 * i - 2].PosY = Height / 2;
-            Fields[2 * i - 2].SpeedX = Res * (random.NextDouble() - 0.5) / i;
-            Fields[2 * i - 2].SpeedY = Res * (random.NextDouble() - 0.5) / i;
+            Fields[2 * i - 2].SpeedX = ResolutionFactor * (random.NextDouble() - 0.5) / i;
+            Fields[2 * i - 2].SpeedY = ResolutionFactor * (random.NextDouble() - 0.5) / i;
         }
 
         using (var Writer = new BinaryWriter(File.Create("video.raw")))
@@ -56,7 +56,7 @@ class Program
             {
                 if (f % 100 == 0) Console.WriteLine(f.ToString("D4") + " frame başladı");
 
-                DoLine();
+                Do16X9Optimized();
 
                 Writer.Write(Pixels);
                 Writer.Flush();
@@ -68,7 +68,7 @@ class Program
         }
 
         System.Diagnostics.Process.Start("ffmpeg",
-        "-y -f rawvideo -pix_fmt rgb24 -s:v 1280x720 -r 60 -i video.raw video720p.mp4");
+        "-y -f rawvideo -pix_fmt rgb24 -s:v 256x144 -r 60 -i video.raw video144p2.mp4");
     }
     static void Update()
     {
@@ -105,5 +105,60 @@ class Program
                 Pixels[startIndex++] = rgb[2];
             }
         });
+    }
+    static void Do16X9()
+    {
+        Parallel.For(0, 9, j => Parallel.For(0, 16, i =>
+        {
+            for (int jj = j * ResolutionFactor; jj < (j + 1) * ResolutionFactor; jj++)
+            {
+                var startIndex = (jj * Width + i * ResolutionFactor) * 3;
+                for (int ii = i * ResolutionFactor; ii < (i + 1) * ResolutionFactor; ii++)
+                {
+                    var p = 2040;
+                    for (int z = 0; z < FieldCount; z++)
+                    {
+                        var distance = Math.Sqrt((ii - Fields[z].PosX) * (ii - Fields[z].PosX) + (jj - Fields[z].PosY) * (jj - Fields[z].PosY));
+                        if (distance < Fields[z].Radius)
+                            p += (int)(Fields[z].Luminance * (1.0 - distance / Fields[z].Radius));
+                    }
+
+                    var rgb = common.PsuedoGreyPlus(p);
+
+                    Pixels[startIndex++] = rgb[0];
+                    Pixels[startIndex++] = rgb[1];
+                    Pixels[startIndex++] = rgb[2];
+                }
+            }
+        }));
+    }
+    static void Do16X9Optimized()
+    {
+        Parallel.For(0, 9, j => Parallel.For(0, 16, i =>
+        {
+            var fij = Fields.Where(f => i * ResolutionFactor < f.PosX + f.Radius && (i + 1) * ResolutionFactor > f.PosX - f.Radius &&
+    j * ResolutionFactor > f.PosY + f.Radius && (j + 1) * ResolutionFactor < f.PosY - f.Radius).ToArray();
+
+            for (int jj = j * ResolutionFactor; jj < (j + 1) * ResolutionFactor; jj++)
+            {
+                var startIndex = (jj * Width + i * ResolutionFactor) * 3;
+                for (int ii = i * ResolutionFactor; ii < (i + 1) * ResolutionFactor; ii++)
+                {
+                    var p = 2040;
+                    for (int z = 0; z < fij.Length; z++)
+                    {
+                        var distance = Math.Sqrt((ii - fij[z].PosX) * (ii - fij[z].PosX) + (jj - fij[z].PosY) * (jj - fij[z].PosY));
+                        if (distance < fij[z].Radius)
+                            p += (int)(fij[z].Luminance * (1.0 - distance / fij[z].Radius));
+                    }
+
+                    var rgb = common.PsuedoGreyPlus(p);
+
+                    Pixels[startIndex++] = rgb[0];
+                    Pixels[startIndex++] = rgb[1];
+                    Pixels[startIndex++] = rgb[2];
+                }
+            }
+        }));
     }
 }
