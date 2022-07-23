@@ -22,7 +22,7 @@ class Program
     static void Main(string[] args)
     {
         var Fps = 60;
-        var Duration = 3;
+        var Duration = 10;
         var FrameCount = Duration * Fps;
 
         ResolutionFactor = 16;
@@ -138,7 +138,7 @@ class Program
         Parallel.For(0, 9, j => Parallel.For(0, 16, i =>
         {
             var fij = Fields.Where(f => IsIntersect(f, new Rectangle(ResolutionFactor * i, ResolutionFactor * j, ResolutionFactor, ResolutionFactor))).ToArray();
-             // Rectangle ctor'u düzeltilmeli?!
+            // Rectangle ctor'u düzeltilmeli?!
             for (int jj = j * ResolutionFactor; jj < (j + 1) * ResolutionFactor; jj++)
             {
                 var startIndex = (jj * Width + i * ResolutionFactor) * 3;
@@ -162,20 +162,22 @@ class Program
         }));
         static bool IsIntersect(Field f, Rectangle rect)
         {
+            
+            var circleDistanceX = Math.Abs((int)f.PosX - ((rect.X + (rect.X + rect.Width)) / 2)); // field-kare merkez farkı
+            var circleDistanceY = Math.Abs((int)f.PosY - ((rect.Y + (rect.Y + rect.Height)) / 2)); // field-kare merkez farkı
 
-            var circleDistanceX = Math.Abs((int)f.PosX - rect.X);
-            var circleDistanceY = Math.Abs((int)f.PosY - rect.Y);
+            if (circleDistanceX > (rect.Width / 2 + f.Radius)) { return false; } // fark, genişlik / 2 + yarıçaptan büyükse uzak
+            if (circleDistanceY > (rect.Height / 2 + f.Radius)) { return false; } // fark, yükseklik / 2 + yarıçaptan büyükse uzak
 
-            if (circleDistanceX > (rect.Width / 2 + f.Radius)) { return false; }
-            if (circleDistanceY > (rect.Height / 2 + f.Radius)) { return false; }
+            if (circleDistanceX <= (rect.Width / 2)) { return true; } // fark, genişlik / 2 den küçükse kesişim var
+            if (circleDistanceY <= (rect.Height / 2)) { return true; } // fark, yükselik / 2 den küçükse kesişim var
 
-            if (circleDistanceX <= (rect.Width / 2)) { return true; }
-            if (circleDistanceY <= (rect.Height / 2)) { return true; }
+            var cornerDistance_sq = Math.Sqrt((circleDistanceX - rect.Width / 2) ^ 2 + 
+                                 (circleDistanceY - rect.Height / 2) ^ 2); 
+            
+            // merkez farklarının karenin köşesine uzaklık farklarının kareleri toplamının kökü
 
-            var cornerDistance_sq = (circleDistanceX - rect.Width / 2) ^ 2 +
-                                 (circleDistanceY - rect.Height / 2) ^ 2;
-
-            return (cornerDistance_sq <= ((int)f.Radius ^ 2));
-        }
+            return (cornerDistance_sq <= (f.Radius)); // bu fark r den küçükse kesişim var.
+         }
     }
 }
