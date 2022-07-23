@@ -1,4 +1,5 @@
-﻿namespace son;
+﻿using System.Drawing;
+namespace son;
 struct Field
 {
     public double Luminance;
@@ -21,7 +22,7 @@ class Program
     static void Main(string[] args)
     {
         var Fps = 60;
-        var Duration = 15;
+        var Duration = 3;
         var FrameCount = Duration * Fps;
 
         ResolutionFactor = 16;
@@ -68,7 +69,7 @@ class Program
         }
 
         System.Diagnostics.Process.Start("ffmpeg",
-        "-y -f rawvideo -pix_fmt rgb24 -s:v 256x144 -r 60 -i video.raw video144p2.mp4");
+        "-y -f rawvideo -pix_fmt rgb24 -s:v 256x144 -r 60 -i video.raw v144.mp4");
     }
     static void Update()
     {
@@ -136,9 +137,8 @@ class Program
     {
         Parallel.For(0, 9, j => Parallel.For(0, 16, i =>
         {
-            var fij = Fields.Where(f => i * ResolutionFactor < f.PosX + f.Radius && (i + 1) * ResolutionFactor > f.PosX - f.Radius &&
-    j * ResolutionFactor > f.PosY + f.Radius && (j + 1) * ResolutionFactor < f.PosY - f.Radius).ToArray();
-
+            var fij = Fields.Where(f => IsIntersect(f, new Rectangle(ResolutionFactor * i, ResolutionFactor * j, ResolutionFactor, ResolutionFactor))).ToArray();
+             // Rectangle ctor'u düzeltilmeli?!
             for (int jj = j * ResolutionFactor; jj < (j + 1) * ResolutionFactor; jj++)
             {
                 var startIndex = (jj * Width + i * ResolutionFactor) * 3;
@@ -160,5 +160,22 @@ class Program
                 }
             }
         }));
+        static bool IsIntersect(Field f, Rectangle rect)
+        {
+
+            var circleDistanceX = Math.Abs((int)f.PosX - rect.X);
+            var circleDistanceY = Math.Abs((int)f.PosY - rect.Y);
+
+            if (circleDistanceX > (rect.Width / 2 + f.Radius)) { return false; }
+            if (circleDistanceY > (rect.Height / 2 + f.Radius)) { return false; }
+
+            if (circleDistanceX <= (rect.Width / 2)) { return true; }
+            if (circleDistanceY <= (rect.Height / 2)) { return true; }
+
+            var cornerDistance_sq = (circleDistanceX - rect.Width / 2) ^ 2 +
+                                 (circleDistanceY - rect.Height / 2) ^ 2;
+
+            return (cornerDistance_sq <= ((int)f.Radius ^ 2));
+        }
     }
 }
