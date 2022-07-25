@@ -1,4 +1,4 @@
-﻿using System.Drawing;
+using System.Drawing;
 namespace son;
 struct Field
 {
@@ -137,7 +137,8 @@ class Program
     {
         Parallel.For(0, 9, j => Parallel.For(0, 16, i =>
         {
-            var fij = Fields.Where(f => IsIntersect(f, new Rectangle(ResolutionFactor * i, ResolutionFactor * j, ResolutionFactor, ResolutionFactor))).ToArray();
+            var fij = Fields.Where(f => IsIntersect2(f, i, j)).ToArray();
+            //var fij = Fields.Where(f => IsIntersect(f, new Rectangle(ResolutionFactor * i, ResolutionFactor * j, ResolutionFactor, ResolutionFactor))).ToArray();
             // Rectangle ctor'u düzeltilmeli?!
             for (int jj = j * ResolutionFactor; jj < (j + 1) * ResolutionFactor; jj++)
             {
@@ -162,7 +163,7 @@ class Program
         }));
         static bool IsIntersect(Field f, Rectangle rect)
         {
-            
+
             var circleDistanceX = Math.Abs((int)f.PosX - ((rect.X + (rect.X + rect.Width)) / 2)); // field-kare merkez farkı
             var circleDistanceY = Math.Abs((int)f.PosY - ((rect.Y + (rect.Y + rect.Height)) / 2)); // field-kare merkez farkı
 
@@ -172,12 +173,24 @@ class Program
             if (circleDistanceX <= (rect.Width / 2)) { return true; } // fark, genişlik / 2 den küçükse kesişim var
             if (circleDistanceY <= (rect.Height / 2)) { return true; } // fark, yükselik / 2 den küçükse kesişim var
 
-            var cornerDistance_sq = Math.Sqrt((circleDistanceX - rect.Width / 2) ^ 2 + 
-                                 (circleDistanceY - rect.Height / 2) ^ 2); 
-            
+            var cornerDistance_sq = Math.Sqrt((circleDistanceX - rect.Width / 2) ^ 2 +
+                                 (circleDistanceY - rect.Height / 2) ^ 2);
+
             // merkez farklarının karenin köşesine uzaklık farklarının kareleri toplamının kökü
 
             return (cornerDistance_sq <= (f.Radius)); // bu fark r den küçükse kesişim var.
-         }
+        }
+        static bool IsIntersect2(Field f, int i, int j)
+        {
+            var x = i * ResolutionFactor + ResolutionFactor / 2;
+            var y = j * ResolutionFactor + ResolutionFactor / 2;
+
+            var dist2 = Math.Sqrt((x - f.PosX) * (x - f.PosX) + (y - f.PosY) * (y - f.PosY));
+
+            if (dist2 < f.Radius + ResolutionFactor * Math.Sqrt(2))
+                return true;
+
+            return false;
+        }
     }
 }
